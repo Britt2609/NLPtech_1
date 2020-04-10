@@ -1,0 +1,29 @@
+This folder contains materials for carrying out Exercise 6 of Chapter 4 in Eisenstein (2018).
+
+Folder contents
+
+README
+review_polarity_data/
+SentiLexiconFromSentiWordNet.txt
+useful_functions_and_modules.py
+
+Explanation and indication of original source:
+
+1. Data
+
+review_polarity_data/
+
+This folder contains Pang and Lee's movie review data (a set of positive and negative movie reviews).
+The data was obtained from www.cs.uic.edu/~liub/FBS/sentiment-analysis.html, accessed March 25, 2020.
+
+2. A Sentiment Lexicon
+
+SentiLexiconFromSentiWordNet.txt
+
+This is a reduced version of the SentiWordNet, containing only entries with some positive or negative score.
+The full version can be obtained from https://github.com/aesuli/SentiWordNet, accessed March 25, 2020.
+
+3. useful_functions_and_modules.py
+
+This file provides two basic functions that illustrate how to create and run a classifier.
+It also provides suggested modules that can help with tokenizing, creating random sets and dealing with structured data. 
