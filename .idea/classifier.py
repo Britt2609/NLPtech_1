@@ -1,19 +1,18 @@
 import csv
 import numpy as np
-import matplotlib.pyplot as plt
 import sklearn.metrics
 from sklearn.metrics import precision_recall_fscore_support
+from sklearn.model_selection import train_test_split
 import pandas as pd
 import os
 from os import walk
-import random
-from nltk.corpus import stopwords
 import string
-from sklearn.model_selection import train_test_split
+import random
 from nltk import word_tokenize
-from nltk.corpus import sentiwordnet as swn
+from nltk.corpus import stopwords, sentiwordnet as swn
 from useful_functions_and_modules import create_vectorizer_and_classifier, classify_data
-
+import scipy.stats
+import statsmodels.stats.proportion
 
 def classifier():
     dataframe = get_df("review_polarity_data")
@@ -30,7 +29,7 @@ def classifier():
             token_score = get_scores(token)
             review_score += token_score[2]
 
-        if review_score < 2:
+        if review_score < 10:
             review_labels.append("neg")
             num_neg += 1
         else:
@@ -43,18 +42,42 @@ def classifier():
 
     test['lexicon_label'] = review_labels
     test['classifier_label'] = result_classifier
-    print(get_result(test.lexicon_label, test.label))
-    print(get_result(test.classifier_label, test.label))
+    lex_prec, lex_rec, lex_f = get_result(test.lexicon_label, test.label)
+    clas_prec, clas_rec, cla_f = get_result(test.classifier_label, test.label)
+
+    print("For the lexicon classifier we have precision " + str(lex_prec) + ", recall " + str(lex_rec) + ", fscore " + str(lex_f))
+    print("For the other classifier we have precision " + str(clas_prec) + ", recall " + str(clas_rec) + ", fscore " + str(cla_f))
+
+    #For the lexicon classifier we have precision [0.7 0.51081081], recall [0.1039604  0.95454545], fscore [0.18103448 0.66549296]
+    #For the other classifier we have precision [0.82828283 0.81188119], recall [0.81188119 0.82828283], fscore [0.82 0.82]
+
+    test['lex_correct'] = [1 if x['label'] == x['lexicon_label'] else 0 for _, x in test.iterrows()]
+    test['clas_correct'] = [1 if x['label'] == x['classifier_label'] else 0 for _, x in test.iterrows()]
+
+    # Test with H0: there is no difference for lexicon based classifier and the other. gives pvalue 4.7582126794873315e-130
+    mean_lex = np.average(test['lex_correct'])
+    mean_reg = np.average(test['clas_correct'])
+    pvalue = scipy.stats.binom_test(mean_reg, test.shape[0], mean_lex)
+    print("p-values is " + str(pvalue))
+
+    # This test is testing the wrong thing I think, it gives p-value 2.949704220103885e-10
+    # test['agreement'] = [1 if x['lexicon_label'] == x['classifier_label'] else 0 for _, x in test.iterrows()]
+    count = 400 - abs(sum(test['clas_correct']) - sum(test['lex_correct']))
+    pvalue2 = statsmodels.stats.proportion.binom_test(count, 400, prop=0.5, alternative='two-sided')
+    print("Or is the pvalue: " + str(pvalue2))
+
 
 def get_result(y_pred, y_true):
-    # This function returns:
-    # precision float (if average is not None) or array of float, shape = [n_unique_labels]
-    # recall float (if average is not None) or array of float, , shape = [n_unique_labels]
-    # fbeta_score float (if average is not None) or array of float, shape = [n_unique_labels]
-    # support None (if average is not None) or array of int, shape = [n_unique_labels]
-    return sklearn.metrics.precision_recall_fscore_support(y_true, y_pred, labels=['neg', 'pos'])
+    # Gets precision, recal and f score of a classifier
+    prec_rec_fscore = sklearn.metrics.precision_recall_fscore_support(y_true, y_pred)
+    precision = prec_rec_fscore[0]
+    recall = prec_rec_fscore[1]
+    fbeta_score = prec_rec_fscore[2]
+
+    return [precision, recall, fbeta_score]
 
 def get_scores(token):
+    # Gets the score of a token from the lexicon
     pos_score = 0
     neg_score = 0
     for syn in swn.senti_synsets(token):
@@ -82,7 +105,7 @@ def get_df(directory):
     return pd.DataFrame(df)
 
 def tokenize(text):
-
+    # Tokenize a text
     tokens = word_tokenize(text)
 
     table = str.maketrans('', '', string.punctuation)
@@ -97,30 +120,32 @@ def tokenize(text):
 
     return tokens
 
-## This was the code I spend 6 hours on because I didn't know there was a function for this.
-def get_scores_of_words():
-    with open("SentiLexiconFromSentiWordNet.txt", 'r') as lexicon:
-        csv_read = csv.reader(lexicon, delimiter='\t')
-        pos_score = []
-        neg_score = []
-        words = {}
-        line_count = 0
-        for row in csv_read:
-            if line_count > 0:
-                word = row[4]
-                pos_score = row[2]
-                neg_score = row[3]
-                if ' ' in word:
-                    wds = word.split(" ")
-                    for w in wds:
-                        split_word = w.split("#", 1)[0]
-                        if split_word not in words:
-                            words[split_word] = [pos_score, neg_score]
-                else:
-                    split_word = word.split("#", 1)[0]
-                    if split_word not in words:
-                        words[split_word] = [pos_score, neg_score]
-            line_count += 1
-        return words
+## This was the code I spend 6 hours on because I didn't know there was a function for getting the score.
+## from the lexicon.
+
+# def get_scores_of_words():
+#     with open("SentiLexiconFromSentiWordNet.txt", 'r') as lexicon:
+#         csv_read = csv.reader(lexicon, delimiter='\t')
+#         pos_score = []
+#         neg_score = []
+#         words = {}
+#         line_count = 0
+#         for row in csv_read:
+#             if line_count > 0:
+#                 word = row[4]
+#                 pos_score = row[2]
+#                 neg_score = row[3]
+#                 if ' ' in word:
+#                     wds = word.split(" ")
+#                     for w in wds:
+#                         split_word = w.split("#", 1)[0]
+#                         if split_word not in words:
+#                             words[split_word] = [pos_score, neg_score]
+#                 else:
+#                     split_word = word.split("#", 1)[0]
+#                     if split_word not in words:
+#                         words[split_word] = [pos_score, neg_score]
+#             line_count += 1
+#         return words
 
 classifier()
